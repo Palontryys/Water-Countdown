@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Countdown Timer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f0f12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Timer">
+<style>
+  :root {
+    --t-bg: #0f0f12;
+    --t-border: rgba(255,255,255,0.08);
+    --t-text: #e8e8f0;
+    --t-muted: #9090a8;
+    --t-accent: #5b8def;
+    --t-accent-dim: rgba(91,141,239,0.2);
+    --t-btn-bg: #2a2a3a;
+    --t-btn-hover: #35354a;
+    --t-btn-border: rgba(255,255,255,0.22);
+    --t-btn-text: #d0d0e8;
+    --t-danger: #e05c6a;
+    --t-add-bg: #242432;
+    --t-add-border: rgba(255,255,255,0.18);
+    --t-bank-bg: #17171f;
+    --t-bank-border: rgba(255,255,255,0.1);
+    --t-sub-bg: #1e1e2a;
+    --t-sub-border: rgba(255,255,255,0.14);
+    --t-sub-text: #b0b0c8;
+  }
+  .pink-mode {
+    --t-bg: #fff5f7;
+    --t-border: rgba(210,100,130,0.15);
+    --t-text: #3d1a26;
+    --t-muted: #b07085;
+    --t-accent: #d4537e;
+    --t-accent-dim: rgba(212,83,126,0.1);
+    --t-btn-bg: #fff0f3;
+    --t-btn-hover: #fce4eb;
+    --t-btn-border: rgba(210,100,130,0.25);
+    --t-btn-text: #3d1a26;
+    --t-danger: #c0334a;
+    --t-add-bg: #fff8fa;
+    --t-add-border: rgba(210,100,130,0.18);
+    --t-bank-bg: #ffeef2;
+    --t-bank-border: rgba(210,100,130,0.2);
+    --t-sub-bg: #fff0f3;
+    --t-sub-border: rgba(210,100,130,0.2);
+    --t-sub-text: #b07085;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #fff0f3;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    font-family: system-ui, -apple-system, sans-serif;
+    transition: background 0.3s;
+  }
+  body.dark-page { background: #0f0f12; }
+
+  #timer-root {
+    background: var(--t-bg);
+    width: 100%;
+    max-width: 560px;
+    /* Fluid padding that scales with viewport */
+    padding: clamp(16px, 4vw, 32px) clamp(14px, 3.5vw, 28px) clamp(20px, 5vw, 36px);
+    transition: background 0.3s;
+  }
+
+  /* ── Top bar ── */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: clamp(14px, 3vw, 22px);
+  }
+  .timer-label {
+    font-size: clamp(10px, 1.8vw, 12px);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--t-muted);
+    font-weight: 500;
+  }
+  .top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .theme-toggle, .notif-toggle {
+    background: var(--t-btn-bg);
+    border: 0.5px solid var(--t-btn-border);
+    border-radius: 20px;
+    padding: clamp(4px, 1vw, 6px) clamp(10px, 2vw, 14px);
+    cursor: pointer;
+    color: var(--t-btn-text);
+    font-size: clamp(11px, 1.8vw, 13px);
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+  .theme-toggle:hover, .notif-toggle:hover { background: var(--t-btn-hover); }
+  .notif-toggle.active {
+    background: var(--t-accent-dim);
+    border-color: var(--t-accent);
+    color: var(--t-accent);
+  }
+  .notif-toggle.active:hover { background: var(--t-accent); color: #fff; }
+  .notif-toggle.blocked {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* ── Main display ── */
+  .display-wrap {
+    text-align: center;
+    padding: clamp(8px, 2vw, 16px) 0 clamp(14px, 3.5vw, 24px);
+  }
+  .time-display {
+    font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+    font-size: clamp(52px, 14vw, 92px);
+    font-weight: 400;
+    color: var(--t-text);
+    letter-spacing: -2px;
+    line-height: 1;
+    transition: color 0.3s;
+    user-select: none;
+  }
+  .time-display.running { color: var(--t-accent); }
+  .time-display.warning { color: var(--t-danger); }
+
+  .status-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: clamp(6px, 1.5vw, 12px);
+    min-height: 20px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--t-muted);
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .status-dot.running { background: var(--t-accent); }
+  .status-dot.warning { background: var(--t-danger); }
+  .status-text {
+    font-size: clamp(10px, 1.8vw, 12px);
+    color: var(--t-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── Controls ── */
+  .controls-section { margin-top: clamp(2px, 0.5vw, 6px); }
+
+  .section-label {
+    font-size: clamp(9px, 1.5vw, 11px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--t-muted);
+    margin-bottom: clamp(6px, 1.5vw, 10px);
+    padding-left: 2px;
+    opacity: 0.7;
+  }
+
+  .preset-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: clamp(5px, 1.2vw, 9px);
+    margin-bottom: clamp(8px, 2vw, 12px);
+  }
+
+  .btn {
+    background: var(--t-btn-bg);
+    border: 0.5px solid var(--t-btn-border);
+    border-radius: 10px;
+    color: var(--t-btn-text);
+    font-family: ui-monospace, monospace;
+    font-size: clamp(11px, 1.8vw, 13px);
+    padding: clamp(8px, 1.8vw, 11px) clamp(4px, 1vw, 8px);
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .btn:hover { background: var(--t-btn-hover); }
+  .btn:active { transform: scale(0.97); }
+  .btn.accent {
+    background: var(--t-accent-dim);
+    border-color: var(--t-accent);
+    color: var(--t-accent);
+  }
+  .btn.accent:hover { background: var(--t-accent); color: #fff; }
+
+  .divider {
+    border: none;
+    border-top: 0.5px solid var(--t-border);
+    margin: clamp(10px, 2.5vw, 14px) 0;
+  }
+
+  /* ── Bank ── */
+  .bank-wrap {
+    background: var(--t-bank-bg);
+    border: 0.5px solid var(--t-bank-border);
+    border-radius: 12px;
+    padding: clamp(10px, 2.5vw, 16px) clamp(12px, 3vw, 18px);
+    margin-bottom: clamp(8px, 2vw, 12px);
+  }
+  .bank-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: clamp(10px, 2.5vw, 14px);
+  }
+  .bank-title {
+    font-size: clamp(9px, 1.5vw, 11px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--t-muted);
+    opacity: 0.7;
+  }
+  .bank-display {
+    font-family: ui-monospace, monospace;
+    font-size: clamp(22px, 5.5vw, 34px);
+    font-weight: 400;
+    color: var(--t-muted);
+    letter-spacing: -0.5px;
+    transition: color 0.2s;
+  }
+  .bank-display.has-value { color: var(--t-accent); }
+
+  .bank-ml-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: clamp(5px, 1.2vw, 9px);
+    margin-bottom: clamp(8px, 2vw, 12px);
+  }
+
+  .btn-ml-add {
+    background: var(--t-add-bg);
+    border: 0.5px solid var(--t-add-border);
+    border-radius: 10px;
+    color: var(--t-btn-text);
+    font-family: ui-monospace, monospace;
+    font-size: clamp(10px, 1.8vw, 12px);
+    padding: clamp(6px, 1.5vw, 9px) clamp(4px, 1vw, 6px);
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
+  }
+  .btn-ml-add:hover { background: var(--t-btn-hover); }
+  .btn-ml-add:active { transform: scale(0.97); }
+
+  .btn-ml-sub {
+    background: var(--t-sub-bg);
+    border: 0.5px solid var(--t-sub-border);
+    border-radius: 10px;
+    color: var(--t-sub-text);
+    font-family: ui-monospace, monospace;
+    font-size: clamp(10px, 1.8vw, 12px);
+    padding: clamp(6px, 1.5vw, 9px) clamp(4px, 1vw, 6px);
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
+  }
+  .btn-ml-sub:hover { background: var(--t-btn-hover); color: var(--t-btn-text); }
+  .btn-ml-sub:active { transform: scale(0.97); }
+
+  .bank-sub-label {
+    font-size: clamp(9px, 1.5vw, 10px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--t-muted);
+    opacity: 0.7;
+    margin-bottom: clamp(4px, 1vw, 7px);
+  }
+
+  .bank-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(5px, 1.2vw, 9px);
+  }
+
+  .btn-commit {
+    background: var(--t-accent);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-family: ui-monospace, monospace;
+    font-size: clamp(11px, 1.8vw, 13px);
+    padding: clamp(8px, 2vw, 11px) clamp(4px, 1vw, 8px);
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    text-align: center;
+    font-weight: 500;
+  }
+  .btn-commit:hover { opacity: 0.88; }
+  .btn-commit:active { transform: scale(0.97); }
+  .btn-commit:disabled { opacity: 0.3; cursor: default; }
+
+  .btn-clear-bank {
+    background: var(--t-sub-bg);
+    border: 0.5px solid var(--t-sub-border);
+    border-radius: 10px;
+    color: var(--t-sub-text);
+    font-family: ui-monospace, monospace;
+    font-size: clamp(11px, 1.8vw, 13px);
+    padding: clamp(8px, 2vw, 11px) clamp(4px, 1vw, 8px);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    text-align: center;
+  }
+  .btn-clear-bank:hover { background: var(--t-btn-hover); color: var(--t-btn-text); }
+
+  /* ── Action row ── */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: clamp(5px, 1.2vw, 9px);
+    align-items: center;
+  }
+
+  .btn-start {
+    background: var(--t-accent);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-family: ui-monospace, monospace;
+    font-size: clamp(12px, 2vw, 14px);
+    padding: clamp(9px, 2.2vw, 13px) clamp(4px, 1vw, 8px);
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    text-align: center;
+    font-weight: 500;
+  }
+  .btn-start:hover { opacity: 0.88; }
+  .btn-start:active { transform: scale(0.97); }
+
+  .btn-reset {
+    background: var(--t-sub-bg);
+    border: 0.5px solid var(--t-sub-border);
+    border-radius: 10px;
+    color: var(--t-sub-text);
+    font-family: ui-monospace, monospace;
+    font-size: clamp(11px, 1.8vw, 13px);
+    padding: clamp(9px, 2.2vw, 13px) clamp(4px, 1vw, 8px);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    text-align: center;
+  }
+  .btn-reset:hover { background: var(--t-btn-hover); color: var(--t-btn-text); }
+
+  .btn-set {
+    background: var(--t-sub-bg);
+    border: 0.5px solid var(--t-sub-border);
+    border-radius: 10px;
+    color: var(--t-sub-text);
+    font-family: ui-monospace, monospace;
+    font-size: clamp(10px, 1.6vw, 12px);
+    padding: clamp(9px, 2.2vw, 13px) clamp(6px, 1.2vw, 10px);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .btn-set:hover { background: var(--t-btn-hover); color: var(--t-btn-text); }
+
+  .set-time-popover {
+    margin-top: clamp(8px, 2vw, 12px);
+    background: var(--t-bank-bg);
+    border: 0.5px solid var(--t-bank-border);
+    border-radius: 12px;
+    padding: clamp(10px, 2.5vw, 14px) clamp(12px, 3vw, 16px);
+  }
+  .set-time-popover.hidden { display: none; }
+  .set-time-row {
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(4px, 1vw, 8px);
+  }
+  .set-time-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+  }
+  .set-time-label {
+    font-size: clamp(9px, 1.4vw, 10px);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--t-muted);
+    opacity: 0.7;
+  }
+  .set-time-input {
+    width: 100%;
+    background: var(--t-btn-bg);
+    border: 0.5px solid var(--t-btn-border);
+    border-radius: 8px;
+    color: var(--t-text);
+    font-family: ui-monospace, monospace;
+    font-size: clamp(16px, 4vw, 22px);
+    padding: clamp(6px, 1.5vw, 9px) 4px;
+    text-align: center;
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  .set-time-input::-webkit-inner-spin-button,
+  .set-time-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .set-time-input:focus { border-color: var(--t-accent); }
+  .set-time-colon {
+    font-family: ui-monospace, monospace;
+    font-size: clamp(18px, 4vw, 24px);
+    color: var(--t-muted);
+    padding-bottom: clamp(6px, 1.5vw, 9px);
+    flex-shrink: 0;
+  }
+  .btn-set-confirm {
+    background: var(--t-accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: clamp(14px, 3vw, 18px);
+    padding: clamp(6px, 1.5vw, 9px) clamp(10px, 2vw, 14px);
+    cursor: pointer;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+    align-self: flex-end;
+  }
+  .btn-set-confirm:hover { opacity: 0.85; }
+
+  
+  @media (max-width: 360px) {
+    .preset-row { grid-template-columns: 1fr 1fr; }
+    .bank-ml-row { grid-template-columns: 1fr 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="timer-root">
+  <div class="top-bar">
+    <span class="timer-label">Countdown</span>
+    <div class="top-bar-right">
+      <button class="notif-toggle" id="notifToggle" onclick="toggleNotifications()" title="Toggle notifications">
+        <span id="notifIcon">🔔</span>
+        <span id="notifLabel">Notify</span>
+      </button>
+      <button class="theme-toggle" onclick="toggleTheme()">
+        <span id="themeIcon">☀️</span>
+        <span id="themeLabel">Light mode</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="display-wrap">
+    <div class="time-display" id="timeDisplay">0:00:00</div>
+    <div class="status-row">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">idle</span>
+    </div>
+  </div>
+
+  <div class="controls-section">
+    <div class="section-label">Preset duration</div>
+    <div class="preset-row">
+      <button class="btn" onclick="setPreset('small')">Short</button>
+      <button class="btn" onclick="setPreset('medium')">Medium</button>
+      <button class="btn" onclick="setPreset('long')">Long</button>
+      <button class="btn accent" onclick="randomize()">⚄ Randomize</button>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section-label">Intake bank</div>
+    <div class="bank-wrap">
+      <div class="bank-top">
+        <span class="bank-title">Banked</span>
+        <span class="bank-display" id="bankDisplay">0 mL</span>
+      </div>
+
+      <div style="margin-bottom: clamp(8px,2vw,12px);">
+        <div class="bank-sub-label">Add</div>
+        <div class="bank-ml-row">
+          <button class="btn-ml-add" onclick="bankAdjust(50,1)">+50 mL</button>
+          <button class="btn-ml-add" onclick="bankAdjust(175,1)">+175 mL</button>
+          <button class="btn-ml-add" onclick="bankAdjust(250,1)">+250 mL</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom: clamp(10px,2.5vw,14px);">
+        <div class="bank-sub-label">Remove</div>
+        <div class="bank-ml-row">
+          <button class="btn-ml-sub" onclick="bankAdjust(50,-1)">−50 mL</button>
+          <button class="btn-ml-sub" onclick="bankAdjust(175,-1)">−175 mL</button>
+          <button class="btn-ml-sub" onclick="bankAdjust(250,-1)">−250 mL</button>
+        </div>
+      </div>
+
+      <div class="bank-actions">
+        <button class="btn-commit" id="commitBtn" onclick="commitBank()" disabled>Apply to timer</button>
+        <button class="btn-clear-bank" onclick="clearBank()">✕ Clear bank</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="action-row">
+      <button class="btn-start" id="startBtn" onclick="toggleTimer()">Start</button>
+      <button class="btn-reset" onclick="hardReset()">Reset</button>
+      <button class="btn-set" onclick="openSetTime()">Set time</button>
+    </div>
+
+    <!-- Set time popover -->
+    <div id="setTimePopover" class="set-time-popover hidden">
+      <div class="set-time-row">
+        <div class="set-time-field">
+          <label class="set-time-label">H</label>
+          <input class="set-time-input" id="setH" type="number" min="0" max="99" value="0">
+        </div>
+        <span class="set-time-colon">:</span>
+        <div class="set-time-field">
+          <label class="set-time-label">M</label>
+          <input class="set-time-input" id="setM" type="number" min="0" max="59" value="0">
+        </div>
+        <span class="set-time-colon">:</span>
+        <div class="set-time-field">
+          <label class="set-time-label">S</label>
+          <input class="set-time-input" id="setS" type="number" min="0" max="59" value="5">
+        </div>
+        <button class="btn-set-confirm" onclick="confirmSetTime()">✓</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let totalSeconds = 0, remaining = 0, running = false, interval = null, isPink = true;
+  let bankMl = 0, bankSeconds = 0;
+  const ML250_MIN = 45 * 60, ML250_MAX = 60 * 60;
+
+  // ── Alerts (beep + notification) ──
+  let alertEnabled = false;
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  function playBeep() {
+    try {
+      const ctx = getAudioCtx();
+      const tones = [880, 660, 440];
+      tones.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const start = ctx.currentTime + i * 0.28;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.35, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.45);
+        osc.start(start);
+        osc.stop(start + 0.5);
+      });
+    } catch(e) {}
+  }
+
+  function sendNotification() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    // Try via service worker first (works when tab is backgrounded on Android)
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'TIMER_DONE' });
+    } else {
+      new Notification('Timer done', {
+        body: 'Your countdown has finished.',
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%235b8def"/><text x="50%25" y="54%25" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="32" font-family="monospace">&#x23F1;</text></svg>'
+      });
+    }
+  }
+
+  function triggerAlert() {
+    if (!alertEnabled) return;
+    playBeep();
+    sendNotification();
+  }
+
+  function updateAlertButton() {
+    const btn = document.getElementById('notifToggle');
+    const icon = document.getElementById('notifIcon');
+    const label = document.getElementById('notifLabel');
+    btn.className = 'notif-toggle';
+    if (alertEnabled) {
+      icon.textContent = '🔔'; label.textContent = 'Alert on';
+      btn.classList.add('active');
+    } else {
+      icon.textContent = '🔕'; label.textContent = 'Alert off';
+    }
+  }
+
+  function toggleNotifications() {
+    if (alertEnabled) {
+      alertEnabled = false;
+      updateAlertButton();
+
+  // ── Register service worker for PWA/Android notifications ──
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+      return;
+    }
+    alertEnabled = true;
+    getAudioCtx(); // must warm up on a user gesture
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission(); // fire and forget — beep works regardless
+    }
+    updateAlertButton();
+
+  // ── Register service worker for PWA/Android notifications ──
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+    playBeep(); // preview so user knows it's working
+  }
+
+  // ── Timer logic ──
+  function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+  function mlToSeconds(ml) {
+    const ratio = ml / 250;
+    return rand(Math.round(ML250_MIN * ratio), Math.round(ML250_MAX * ratio));
+  }
+
+  function setPreset(size) {
+    let mins;
+    if (size === 'small') mins = rand(90, 150);
+    else if (size === 'medium') mins = rand(150, 270);
+    else mins = rand(270, 330);
+    totalSeconds = mins * 60;
+    remaining = totalSeconds;
+    if (running) pauseTimer();
+    updateDisplay();
+    setStatus('idle');
+  }
+
+  function randomize() { setPreset(['small','medium','long'][rand(0,2)]); }
+
+  function bankAdjust(ml, direction) {
+    const newMl = bankMl + direction * ml;
+    if (newMl <= 0) { bankMl = 0; bankSeconds = 0; }
+    else { bankSeconds = Math.max(0, bankSeconds + direction * mlToSeconds(ml)); bankMl = newMl; }
+    updateBank();
+  }
+
+  function updateBank() {
+    const el = document.getElementById('bankDisplay');
+    el.textContent = bankMl + ' mL';
+    el.className = 'bank-display' + (bankMl > 0 ? ' has-value' : '');
+    document.getElementById('commitBtn').disabled = bankMl === 0;
+  }
+
+  function commitBank() {
+    if (bankMl === 0) return;
+    remaining = Math.max(0, remaining - bankSeconds);
+    updateDisplay();
+    if (remaining === 0 && running) { pauseTimer(); setStatus('done'); triggerAlert(); }
+    clearBank();
+  }
+
+  function clearBank() { bankMl = 0; bankSeconds = 0; updateBank(); }
+
+  function toggleTimer() {
+    if (remaining === 0) return;
+    running ? pauseTimer() : startTimer();
+  }
+
+  function startTimer() {
+    if (remaining <= 0) return;
+    running = true;
+    document.getElementById('startBtn').textContent = 'Pause';
+    setStatus('running');
+    interval = setInterval(() => {
+      remaining--;
+      updateDisplay();
+      if (remaining <= 0) {
+        clearInterval(interval); running = false;
+        document.getElementById('startBtn').textContent = 'Start';
+        setStatus('done');
+        triggerAlert();
+      }
+    }, 1000);
+  }
+
+  function pauseTimer() {
+    clearInterval(interval); running = false;
+    document.getElementById('startBtn').textContent = 'Start';
+    setStatus(remaining > 0 ? 'paused' : 'done');
+  }
+
+  function stopTimer() { pauseTimer(); }
+
+  function hardReset() {
+    clearInterval(interval); running = false;
+    totalSeconds = 0; remaining = 0;
+    document.getElementById('startBtn').textContent = 'Start';
+    updateDisplay(); setStatus('idle');
+  }
+
+  function setStatus(s) {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    const disp = document.getElementById('timeDisplay');
+    dot.className = 'status-dot'; disp.className = 'time-display';
+    if (s === 'running') {
+      dot.classList.add(remaining < 600 ? 'warning' : 'running');
+      disp.classList.add(remaining < 600 ? 'warning' : 'running');
+      txt.textContent = remaining < 600 ? 'low time' : 'running';
+    } else if (s === 'paused') { txt.textContent = 'paused'; }
+    else if (s === 'done') { txt.textContent = 'done'; dot.classList.add('warning'); }
+    else { txt.textContent = 'idle'; }
+  }
+
+  function updateDisplay() {
+    const h = Math.floor(remaining / 3600);
+    const m = Math.floor((remaining % 3600) / 60);
+    const s = remaining % 60;
+    document.getElementById('timeDisplay').textContent =
+      h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    if (running) setStatus('running');
+  }
+
+  function toggleTheme() {
+    isPink = !isPink;
+    document.getElementById('timer-root').classList.toggle('pink-mode', isPink);
+    document.body.classList.toggle('dark-page', !isPink);
+    document.getElementById('themeIcon').textContent = isPink ? '🌙' : '☀️';
+    document.getElementById('themeLabel').textContent = isPink ? 'Dark mode' : 'Light mode';
+  }
+
+  // ── Set time ──
+  function openSetTime() {
+    const pop = document.getElementById('setTimePopover');
+    pop.classList.toggle('hidden');
+    if (!pop.classList.contains('hidden')) document.getElementById('setH').focus();
+  }
+
+  function confirmSetTime() {
+    const h = Math.max(0, parseInt(document.getElementById('setH').value) || 0);
+    const m = Math.max(0, Math.min(59, parseInt(document.getElementById('setM').value) || 0));
+    const s = Math.max(0, Math.min(59, parseInt(document.getElementById('setS').value) || 0));
+    const secs = h * 3600 + m * 60 + s;
+    if (secs <= 0) return;
+    if (running) pauseTimer();
+    totalSeconds = secs;
+    remaining = secs;
+    updateDisplay();
+    setStatus('idle');
+    document.getElementById('setTimePopover').classList.add('hidden');
+  }
+
+  // ── Init ──
+  document.getElementById('timer-root').classList.add('pink-mode');
+  // body starts with light pink background (no dark-page class needed)
+  document.getElementById('themeIcon').textContent = '🌙';
+  document.getElementById('themeLabel').textContent = 'Dark mode';
+  updateAlertButton();
+
+  // ── Register service worker for PWA/Android notifications ──
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
