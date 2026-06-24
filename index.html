@@ -546,7 +546,7 @@
 </div>
 
 <script>
-  let totalSeconds = 0, remaining = 0, running = false, interval = null, isPink = true;
+  let totalSeconds = 0, remaining = 0, running = false, interval = null, isPink = true, endTime = 0;
   let bankMl = 0, bankSeconds = 0;
   const ML250_MIN = 45 * 60, ML250_MAX = 60 * 60;
 
@@ -680,6 +680,8 @@
   function commitBank() {
     if (bankMl === 0) return;
     remaining = Math.max(0, remaining - bankSeconds);
+    // Update endTime to reflect new remaining
+    if (running) endTime = Date.now() + remaining * 1000;
     updateDisplay();
     if (remaining === 0 && running) { pauseTimer(); setStatus('done'); triggerAlert(); }
     clearBank();
@@ -695,10 +697,13 @@
   function startTimer() {
     if (remaining <= 0) return;
     running = true;
+    endTime = Date.now() + remaining * 1000;
     document.getElementById('startBtn').textContent = 'Pause';
     setStatus('running');
+    // Schedule a one-shot notification via service worker when timer ends
+    scheduleNotification(remaining);
     interval = setInterval(() => {
-      remaining--;
+      remaining = Math.max(0, Math.round((endTime - Date.now()) / 1000));
       updateDisplay();
       if (remaining <= 0) {
         clearInterval(interval); running = false;
@@ -706,11 +711,12 @@
         setStatus('done');
         triggerAlert();
       }
-    }, 1000);
+    }, 500); // poll every 500ms so it stays accurate after sleep
   }
 
   function pauseTimer() {
     clearInterval(interval); running = false;
+    cancelScheduledNotification();
     document.getElementById('startBtn').textContent = 'Start';
     setStatus(remaining > 0 ? 'paused' : 'done');
   }
@@ -719,9 +725,26 @@
 
   function hardReset() {
     clearInterval(interval); running = false;
-    totalSeconds = 0; remaining = 0;
+    cancelScheduledNotification();
+    totalSeconds = 0; remaining = 0; endTime = 0;
     document.getElementById('startBtn').textContent = 'Start';
     updateDisplay(); setStatus('idle');
+  }
+
+  // ── Schedule notification via service worker ──
+  // We tell the SW to fire a notification after N seconds using setTimeout inside the SW.
+  // This survives screen-off better than a page-side setTimeout.
+  function scheduleNotification(seconds) {
+    if (!alertEnabled) return;
+    navigator.serviceWorker.ready.then(reg => {
+      if (reg.active) reg.active.postMessage({ type: 'SCHEDULE', seconds });
+    }).catch(() => {});
+  }
+
+  function cancelScheduledNotification() {
+    navigator.serviceWorker.ready.then(reg => {
+      if (reg.active) reg.active.postMessage({ type: 'CANCEL' });
+    }).catch(() => {});
   }
 
   function setStatus(s) {
