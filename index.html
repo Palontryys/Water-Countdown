@@ -582,14 +582,18 @@
 
   function sendNotification() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    // Try via service worker first (works when tab is backgrounded on Android)
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: 'TIMER_DONE' });
-    } else {
-      new Notification('Timer done', {
-        body: 'Your countdown has finished.',
-        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="%235b8def"/><text x="50%25" y="54%25" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="32" font-family="monospace">&#x23F1;</text></svg>'
+    // Android Chrome requires notifications via service worker registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification('Timer done', {
+          body: 'Your countdown has finished.',
+          vibrate: [200, 100, 200],
+          tag: 'countdown-done',
+          renotify: true
+        });
       });
+    } else {
+      new Notification('Timer done', { body: 'Your countdown has finished.' });
     }
   }
 
