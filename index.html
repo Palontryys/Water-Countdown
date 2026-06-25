@@ -441,6 +441,15 @@
   .btn-set-confirm:hover { opacity: 0.85; }
 
   
+  .version-tag {
+    text-align: right;
+    font-size: 11px;
+    color: var(--t-muted);
+    opacity: 0.5;
+    margin-top: 12px;
+    font-family: ui-monospace, monospace;
+  }
+
   @media (max-width: 360px) {
     .preset-row { grid-template-columns: 1fr 1fr; }
     .bank-ml-row { grid-template-columns: 1fr 1fr 1fr; }
@@ -542,7 +551,8 @@
         <button class="btn-set-confirm" onclick="confirmSetTime()">✓</button>
       </div>
     </div>
-  </div>
+    <div class="version-tag">v1.0</div>
+</div>
 </div>
 
 <script>
